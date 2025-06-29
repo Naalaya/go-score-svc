@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: go-score-svc
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    envVars:
+      - key: APP_NAME
+        value: "Go Score Service"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://go-score-svc.onrender.com
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_STDERR_FORMATTER
+        value: Monolog\Formatter\JsonFormatter
+      - key: DB_CONNECTION
+        value: mysql
+      - key: SESSION_DRIVER
+        value: array
+      - key: CACHE_DRIVER
+        value: array
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: DB_HOST
+        fromDatabase:
+          name: go-score-svc-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: go-score-svc-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: go-score-svc-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: go-score-svc-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: go-score-svc-db
+          property: password
+
+databases:
+  - name: go-score-svc-db
+    databaseName: score_db
+    user: score_user

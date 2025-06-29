@@ -1,0 +1,52 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+vendor
+
+# Testing
+tests
+phpunit.xml
+.phpunit.result.cache
+
+# Development
+.env
+.env.local
+.env.example
+.env.testing
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+storage/logs/*
+
+# Cache
+bootstrap/cache/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+
+# Build artifacts
+public/hot
+public/storage
+public/js
+public/css
+
+# Documentation
+README.md
+DEPLOY.md
+
+# Development tools
+Makefile
+docker-compose.yml
