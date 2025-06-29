@@ -14,13 +14,15 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libzip-dev \
-    default-mysql-client
+    default-mysql-client\
+    sqlite3 \
+    libsqlite3-dev
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+RUN docker-php-ext-install pdo_sqlite pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -36,8 +38,8 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
-# Configure Apache
-RUN a2enmod rewrite
+# Configure Apache - Enable required modules
+RUN a2enmod rewrite headers deflate
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
 # Optimize Laravel for production
