@@ -19,9 +19,19 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'],
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'https://go-score-fe.vercel.app',
+        'https://go-score-oqb7qsi94-naalayas-projects.vercel.app'
+    ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^https:\/\/.*\.vercel\.app$/',
+        '/^https:\/\/go-score-.*\.vercel\.app$/'
+    ],
 
     'allowed_headers' => ['*'],
 
