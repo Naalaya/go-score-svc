@@ -76,27 +76,44 @@ class ScoreService implements ScoreServiceInterface
     }
 
     /**
-     * Calculate statistics for a specific subject using new service.
+     * Calculate statistics for a specific subject using database aggregation.
      */
     private function calculateSubjectStatistics(Subject $subject): array
     {
-        $scores = Score::whereNotNull($subject->code)
-                      ->pluck($subject->code)
-                      ->filter(fn($score) => !is_null($score))
-                      ->toArray();
+        $subjectCode = $subject->code;
 
-        if (empty($scores)) {
+        // Use database aggregation instead of loading all records
+        $aggregates = Score::whereNotNull($subjectCode)
+            ->selectRaw("
+                COUNT(*) as total,
+                MAX({$subjectCode}) as max_score,
+                MIN({$subjectCode}) as min_score,
+                AVG({$subjectCode}) as avg_score,
+                SUM(CASE WHEN {$subjectCode} >= 8.0 THEN 1 ELSE 0 END) as excellent,
+                SUM(CASE WHEN {$subjectCode} >= 6.0 AND {$subjectCode} < 8.0 THEN 1 ELSE 0 END) as good,
+                SUM(CASE WHEN {$subjectCode} >= 4.0 AND {$subjectCode} < 6.0 THEN 1 ELSE 0 END) as average,
+                SUM(CASE WHEN {$subjectCode} < 4.0 THEN 1 ELSE 0 END) as weak
+            ")
+            ->first();
+
+        if (!$aggregates || $aggregates->total == 0) {
             return ['total' => 0];
         }
 
-        // Use new scoring service
-        $stats = $this->scoringService->calculateStatistics($scores);
+        $stats = [
+            'total' => (int) $aggregates->total,
+            'excellent' => (int) $aggregates->excellent,
+            'good' => (int) $aggregates->good,
+            'average' => (int) $aggregates->average,
+            'weak' => (int) $aggregates->weak,
+            'average_score' => round((float) $aggregates->avg_score, 2),
+        ];
 
         // Add subject metadata
         $stats['subject_name'] = $subject->display_name;
         $stats['subject_code'] = $subject->code;
-        $stats['maxScore'] = max($scores);
-        $stats['minScore'] = min($scores);
+        $stats['maxScore'] = number_format((float) $aggregates->max_score, 2);
+        $stats['minScore'] = number_format((float) $aggregates->min_score, 2);
 
         // Calculate percentages
         $stats['percentages'] = $this->calculatePercentages($stats, $stats['total']);
