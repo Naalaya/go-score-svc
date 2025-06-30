@@ -38,8 +38,11 @@ class ImportController extends Controller
                 ],
                 'memory_info' => [
                     'memory_limit' => ini_get('memory_limit'),
+                    'memory_limit_mb' => $this->parseMemoryLimit(ini_get('memory_limit')),
                     'memory_usage' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
                     'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
+                    'recommended_command' => $this->parseMemoryLimit(ini_get('memory_limit')) <= 256 ? 'scores:micro-import' : 'scores:fast-import',
+                    'recommended_settings' => $this->getRecommendedSettings(),
                 ],
                 'server_info' => [
                     'php_version' => PHP_VERSION,
@@ -72,18 +75,36 @@ class ImportController extends Controller
             ], 404);
         }
 
-        // Get parameters
-        $batch = (int) ($request->input('batch', 1000));
-        $chunk = (int) ($request->input('chunk', 5000));
-        $memoryLimit = $request->input('memory_limit', '512M');
+        // Auto-detect optimal settings based on current memory limit
+        $currentMemoryLimit = ini_get('memory_limit');
+        $memoryInMB = $this->parseMemoryLimit($currentMemoryLimit);
 
-        try {
-            // Run import in background (for production, consider using queues)
-            $exitCode = Artisan::call('scores:fast-import', [
+        // Auto-select command and parameters based on available memory
+        if ($memoryInMB <= 256) {
+            // Use micro import for low memory environments
+            $command = 'scores:micro-import';
+            $batch = (int) ($request->input('batch', 25));
+            $memoryLimit = $request->input('memory_limit', '256M');
+            $params = [
+                '--batch' => $batch,
+                '--memory-limit' => $memoryLimit,
+            ];
+        } else {
+            // Use fast import for normal memory environments
+            $command = 'scores:fast-import';
+            $batch = (int) ($request->input('batch', 300));
+            $chunk = (int) ($request->input('chunk', 1500));
+            $memoryLimit = $request->input('memory_limit', '512M');
+            $params = [
                 '--batch' => $batch,
                 '--chunk' => $chunk,
                 '--memory-limit' => $memoryLimit,
-            ]);
+            ];
+        }
+
+        try {
+            // Run import with auto-selected command and parameters
+            $exitCode = Artisan::call($command, $params);
 
             if ($exitCode === 0) {
                 return response()->json([
@@ -178,6 +199,73 @@ class ImportController extends Controller
                 'success' => false,
                 'message' => 'Sample import failed: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+        /**
+     * Get recommended import settings based on current memory
+     */
+    private function getRecommendedSettings(): array
+    {
+        $memoryInMB = $this->parseMemoryLimit(ini_get('memory_limit'));
+
+        if ($memoryInMB <= 128) {
+            return [
+                'command' => 'scores:micro-import',
+                'batch' => 15,
+                'memory_limit' => '128M',
+                'estimated_time' => '2-4 hours',
+                'description' => 'Ultra-conservative for 128M memory'
+            ];
+        } elseif ($memoryInMB <= 256) {
+            return [
+                'command' => 'scores:micro-import',
+                'batch' => 25,
+                'memory_limit' => '256M',
+                'estimated_time' => '1.5-3 hours',
+                'description' => 'Safe for 256M memory'
+            ];
+        } elseif ($memoryInMB <= 512) {
+            return [
+                'command' => 'scores:fast-import',
+                'batch' => 200,
+                'chunk' => 1000,
+                'memory_limit' => '512M',
+                'estimated_time' => '30-60 minutes',
+                'description' => 'Moderate for 512M memory'
+            ];
+        } else {
+            return [
+                'command' => 'scores:fast-import',
+                'batch' => 500,
+                'chunk' => 2500,
+                'memory_limit' => '1G',
+                'estimated_time' => '15-30 minutes',
+                'description' => 'Fast for 1G+ memory'
+            ];
+        }
+    }
+
+    /**
+     * Parse memory limit string to MB
+     */
+    private function parseMemoryLimit(string $memoryLimit): int
+    {
+        $memoryLimit = strtoupper(trim($memoryLimit));
+
+        // Extract numeric value
+        $numeric = (int) preg_replace('/[^0-9]/', '', $memoryLimit);
+
+        // Convert to MB based on suffix
+        if (strpos($memoryLimit, 'G') !== false) {
+            return $numeric * 1024; // GB to MB
+        } elseif (strpos($memoryLimit, 'M') !== false) {
+            return $numeric; // Already in MB
+        } elseif (strpos($memoryLimit, 'K') !== false) {
+            return max(1, $numeric / 1024); // KB to MB
+        } else {
+            // Assume bytes, convert to MB
+            return max(1, $numeric / 1024 / 1024);
         }
     }
 
